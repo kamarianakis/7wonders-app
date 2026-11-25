@@ -1,0 +1,14 @@
+{
+  "name": "7 Wonders Score",
+  "short_name": "7 Wonders",
+  "description": "Score keeper, seating randomizer, stats and turn timer for 7 Wonders.",
+  "start_url": "./index.html#/history",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f2ee",
+  "theme_color": "#f4f2ee",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}

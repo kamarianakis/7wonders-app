@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ✏️  Add the Google accounts that may use the app (lowercase, one per line).
+    //    After editing: Firebase console → Firestore → Rules → Publish.
+    function isAllowed() {
+      return request.auth != null
+          && request.auth.token.email_verified == true
+          && request.auth.token.email.lower() in [
+               'YOUR_EMAIL@gmail.com'
+               // , 'friend1@gmail.com'
+               // , 'friend2@gmail.com'
+             ];
+    }
+
+    match /players/{id} {
+      allow read, delete: if isAllowed();
+      allow create, update: if isAllowed()
+                            && request.resource.data.name is string
+                            && request.resource.data.name.size() > 0
+                            && request.resource.data.name.size() <= 40;
+    }
+
+    match /games/{id} {
+      allow read, delete: if isAllowed();
+      allow create, update: if isAllowed()
+                            && request.resource.data.players is list
+                            && request.resource.data.players.size() >= 2
+                            && request.resource.data.players.size() <= 8
+                            && request.resource.data.date is string;
+    }
+
+    // everything else is locked
+  }
+}
