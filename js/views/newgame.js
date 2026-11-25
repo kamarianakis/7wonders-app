@@ -4,7 +4,7 @@ import * as store from '../store.js';
 import { esc, go, icons, toast, confirmDialog, openModal } from '../ui.js';
 import {
   CATEGORIES, EXPANSIONS, SET_LABELS, SIDES, WONDERS, activeCategories, availableWonders, buildGame,
-  categoryPoints, emptyScores, rankPlayers, scienceScore, totalPoints, wonderById,
+  categoryPoints, emptyScores, rankPlayers, tiedOnPoints, scienceScore, totalPoints, wonderById,
 } from '../data.js';
 import { freshDraft, getDraft, resetDraft, saveDraft } from '../draft.js';
 
@@ -397,9 +397,9 @@ function mountWizard(root, mode, step, d) {
     const stepper = (pid, key, label) => {
       const c = catByKey(key);
       return `<div class="stepper">
-        <button type="button" class="st-btn" data-act="dec" data-pid="${esc(pid)}" data-key="${key}" aria-label="Decrease ${esc(label)}">−</button>
+        <button type="button" tabindex="-1" class="st-btn" data-act="dec" data-pid="${esc(pid)}" data-key="${key}" aria-label="Decrease ${esc(label)}">−</button>
         <input class="st-in" type="number" ${c.allowNegative ? '' : 'inputmode="numeric" min="0"'} step="1" value="${d.scores[pid][key]}" data-pid="${esc(pid)}" data-key="${key}" aria-label="${esc(label)}">
-        <button type="button" class="st-btn" data-act="inc" data-pid="${esc(pid)}" data-key="${key}" aria-label="Increase ${esc(label)}">+</button>
+        <button type="button" tabindex="-1" class="st-btn" data-act="inc" data-pid="${esc(pid)}" data-key="${key}" aria-label="Increase ${esc(label)}">+</button>
       </div>`;
     };
     const calcBtn = (pid) => `<button type="button" class="mini-btn" data-act="sci" data-pid="${esc(pid)}" aria-label="Science calculator">${icons.calc}</button>`;
@@ -427,9 +427,10 @@ function mountWizard(root, mode, step, d) {
 
     const standingsHtml = () => {
       const ranked = rankPlayers(d.seating.map((s) => ({ id: s.playerId, name: s.name, total: total(s.playerId), scores: d.scores[s.playerId] })));
+      const tied = tiedOnPoints(ranked);
       return ranked.map((p) => `
         <div class="srow ${p.rank === 1 ? 'first' : ''}">
-          <span class="rk">${p.rank}</span><div class="who"><b>${esc(p.name)}</b></div><span class="t">${p.total}</span>
+          <span class="rk">${p.rank}</span><div class="who"><b>${esc(p.name)}</b>${tied.has(p.id) ? `<small>Tie-break · ${p.scores?.coins || 0} coins</small>` : ''}</div><span class="t">${p.total}</span>
         </div>`).join('');
     };
 
@@ -506,8 +507,8 @@ function mountWizard(root, mode, step, d) {
         `<h3>Science · ${esc(s.name)}</h3><p>Count the science symbols. Wild symbols are placed for the best score.</p>
          ${rows.map(([k, l, col]) => `
            <div class="srow"><div class="who" style="display:flex;align-items:center;gap:10px"><span class="dot" style="background:${col}"></span><b>${l}</b></div>
-             <div class="stepper"><button type="button" class="st-btn" data-k="${k}" data-d="-1">−</button>
-             <input class="st-in" type="number" inputmode="numeric" min="0" value="0" data-k="${k}"><button type="button" class="st-btn" data-k="${k}" data-d="1">+</button></div></div>`).join('')}
+             <div class="stepper"><button type="button" tabindex="-1" class="st-btn" data-k="${k}" data-d="-1">−</button>
+             <input class="st-in" type="number" inputmode="numeric" min="0" value="0" data-k="${k}"><button type="button" tabindex="-1" class="st-btn" data-k="${k}" data-d="1">+</button></div></div>`).join('')}
          <div class="srow"><div class="who"><b>Score</b><small id="sc-detail"></small></div><span class="ptotal" id="sc-total">0</span></div>
          <div class="modal-actions"><button class="btn ghost" data-r="x">Cancel</button><button class="btn primary" data-r="use">Use score</button></div>`,
         (m, close) => {

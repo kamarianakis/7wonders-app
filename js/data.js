@@ -87,6 +87,13 @@ export function rankPlayers(players) {
   });
 }
 
+/** Ids of players whose total points equal someone else's (so the coins tie-break is in play). */
+export function tiedOnPoints(players) {
+  const count = new Map();
+  for (const p of players) count.set(p.total, (count.get(p.total) || 0) + 1);
+  return new Set(players.filter((p) => count.get(p.total) > 1).map((p) => p.id));
+}
+
 /** Builds the persisted game document from a draft-like object. */
 export function buildGame({ date, expansions, seating, scores, createdAt, past = false }) {
   const players = seating.map((s, i) => {

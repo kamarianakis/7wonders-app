@@ -1,6 +1,6 @@
 import * as store from '../store.js';
 import { esc, go, fmtDateShort, fmtDateLong, icons, confirmDialog, toast } from '../ui.js';
-import { activeCategories, CATEGORIES, categoryPoints, wonderById, SIDES, EXPANSIONS } from '../data.js';
+import { activeCategories, CATEGORIES, categoryPoints, wonderById, SIDES, EXPANSIONS, tiedOnPoints } from '../data.js';
 import { getDraft, hasProgress, resetDraft, saveDraft } from '../draft.js';
 
 const skeleton = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
@@ -85,6 +85,7 @@ export function gameView(root, [id]) {
     const cats = activeCategories(g.expansions);
     const chips = EXPANSIONS.filter((x) => g.expansions[x.key]).map((x) => `<span class="chip">${esc(x.name)}</span>`).join('');
     const ranks = rankLabel(g.players);
+    const tiedSet = tiedOnPoints(g.players);
 
     root.innerHTML = `
       ${topbar()}
@@ -97,7 +98,7 @@ export function gameView(root, [id]) {
           ${chips ? `<div class="chips">${chips}</div>` : ''}
         </div>
         <div class="h2">Game results</div>
-        ${g.players.map((p, i) => accordion(p, ranks[i], cats, g.winnerIds.includes(p.id), open.has(p.id))).join('')}
+        ${g.players.map((p, i) => accordion(p, ranks[i], cats, g.winnerIds.includes(p.id), open.has(p.id), tiedSet.has(p.id))).join('')}
         <div style="height:12px"></div>
         <button class="btn outline block" data-act="edit" style="margin-bottom:10px">Edit scores</button>
         <button class="btn outline block" data-act="delete">Delete</button>
@@ -143,14 +144,14 @@ function rankLabel(players) {
   });
 }
 
-function accordion(p, rank, cats, isWinner, isOpen) {
+function accordion(p, rank, cats, isWinner, isOpen, tied) {
   const w = p.wonder ? wonderById(p.wonder) : null;
   const meta = [w ? `${w.name}${p.side ? ' · ' + SIDES[p.side] : ''}` : null, p.seat != null ? `Seat ${p.seat + 1}` : null].filter(Boolean).join(' · ');
   return `
     <div class="acc ${isWinner ? 'win' : ''} ${isOpen ? 'open' : ''}" data-pid="${esc(p.id)}">
       <button class="acc-head" data-act="toggle">
         <span class="rk">${rank === 1 ? '🏆' : rank}</span>
-        <span class="nm">${esc(p.name)}</span>
+        <span class="nm">${esc(p.name)}${tied ? `<small style="display:block;font-weight:500;opacity:.65;font-size:12px">Tie-break · ${p.scores?.coins || 0} coins</small>` : ''}</span>
         <span class="tot">${p.total}</span>
         <span class="chev">${isOpen ? icons.chevronUp : icons.chevronDown}</span>
       </button>
