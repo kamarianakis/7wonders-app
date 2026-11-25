@@ -42,6 +42,9 @@ body {
 body.modal-open { overflow: hidden; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
+/* no double-tap zoom on rapid taps (+/−, tabs…); pinch-zoom still works */
+html, body, button, a, input, .tile, .pill, .seg, .acc-head { touch-action: manipulation; }
+button, .tile, .pill, .seg button, .acc-head, .tab, .fab { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 h1, h2, h3, p { margin: 0; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
