@@ -8,6 +8,7 @@ export function freshDraft() {
   return {
     started: false,
     editingId: null,
+    past: false,           // manually entered older game: no seating / wonders
     createdAt: null,
     step: 'players',
     date: todayISO(),

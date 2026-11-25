@@ -1,7 +1,7 @@
 import * as store from '../store.js';
 import { esc, go, fmtDateShort, fmtDateLong, icons, confirmDialog, toast } from '../ui.js';
 import { activeCategories, CATEGORIES, categoryPoints, wonderById, SIDES, EXPANSIONS } from '../data.js';
-import { getDraft, hasProgress, resetDraft } from '../draft.js';
+import { getDraft, hasProgress, resetDraft, saveDraft } from '../draft.js';
 
 const skeleton = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
 
@@ -21,7 +21,10 @@ export function historyView(root) {
       <div class="page">
         <header class="head">
           <h1 class="h1 big">History</h1>
-          <a class="icon-btn" href="#/settings" aria-label="Settings">${icons.settings}</a>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button class="btn ghost small" data-act="past">Add old game</button>
+            <a class="icon-btn" href="#/settings" aria-label="Settings">${icons.settings}</a>
+          </div>
         </header>
         ${inProgress ? `
           <div class="banner">
@@ -45,11 +48,12 @@ export function historyView(root) {
     if (act === 'resume') go('#/new/' + (getDraft().step || 'players'));
     else if (act === 'discard') {
       if (await confirmDialog({ title: 'Discard this game?', message: 'The players, seating and scores entered so far will be lost.', confirmLabel: 'Discard', danger: true })) { resetDraft(); render(); }
-    } else if (act === 'new') {
+    } else if (act === 'new' || act === 'past') {
       if (hasProgress()) {
         if (!(await confirmDialog({ title: 'Start a new game?', message: 'You have a game in progress. Starting a new one discards it.', confirmLabel: 'Start new', danger: true }))) return;
       }
-      resetDraft();
+      const d = resetDraft();
+      if (act === 'past') { d.past = true; d.expansions.wondersPack = false; saveDraft(); }
       go('#/new/players');
     }
   };

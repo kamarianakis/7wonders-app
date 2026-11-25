@@ -88,14 +88,14 @@ export function rankPlayers(players) {
 }
 
 /** Builds the persisted game document from a draft-like object. */
-export function buildGame({ date, expansions, seating, scores, createdAt }) {
+export function buildGame({ date, expansions, seating, scores, createdAt, past = false }) {
   const players = seating.map((s, i) => {
     const sc = {};
     for (const c of activeCategories(expansions)) sc[c.key] = Number(scores[s.playerId]?.[c.key]) || 0;
     return {
       id: s.playerId,
       name: s.name,
-      seat: i,
+      seat: past ? null : i,
       wonder: s.wonder || null,
       side: s.side || null,
       scores: sc,
@@ -107,6 +107,7 @@ export function buildGame({ date, expansions, seating, scores, createdAt }) {
   return {
     date,
     createdAt: createdAt || Date.now(),
+    manual: !!past, // entered after the fact: no seating/wonder info
     expansions: { leaders: !!expansions.leaders, cities: !!expansions.cities, wondersPack: !!expansions.wondersPack },
     players: ranked.map(({ rank, ...p }) => p), // stored in rank order (best first)
     winnerIds: winners.map((w) => w.id),

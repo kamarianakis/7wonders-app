@@ -14,7 +14,7 @@ export function newGameView(root, [step]) {
   const d = getDraft();
   if (!STEPS.includes(step)) step = 'players';
   if (step !== 'players' && d.selected.length < 2) { location.replace('#/new/players'); return; }
-  if (step === 'scores' && d.seating.length < 2) { location.replace('#/new/setup'); return; }
+  if (step === 'scores' && d.seating.length < 2 && !d.past) { location.replace('#/new/setup'); return; }
   return mountWizard(root, 'new', step, d);
 }
 
@@ -38,7 +38,7 @@ function draftFromGame(g) {
   const scores = {};
   for (const p of g.players) scores[p.id] = { ...emptyScores(), ...p.scores };
   return {
-    ...freshDraft(), started: true, editingId: g.id, createdAt: g.createdAt, date: g.date,
+    ...freshDraft(), started: true, past: !!g.manual, editingId: g.id, createdAt: g.createdAt, date: g.date,
     expansions: { ...g.expansions }, selected: seating.map((s) => s.playerId), seating, scores,
     wonderSig: 'edit',
   };
@@ -91,6 +91,7 @@ function mountWizard(root, mode, step, d) {
   const goStep = (s) => go('#/new/' + s);
   const onBack = () => {
     if (edit) return go('#/game/' + d.editingId);
+    if (d.past && step === 'scores') return goStep('expansions');
     const i = STEPS.indexOf(step);
     if (i <= 0) go('#/history'); else goStep(STEPS[i - 1]);
   };
@@ -117,7 +118,8 @@ function mountWizard(root, mode, step, d) {
        <form class="add-row" autocomplete="off">
          <input class="input" id="newName" placeholder="New player name" maxlength="24" enterkeyhint="done">
          <button class="btn primary" type="submit">Add</button>
-       </form>`,
+       </form>
+       <div id="pastBox" style="margin-top:22px"></div>`,
       '<button class="btn primary block" data-act="next" id="nextBtn">Next</button>'
     );
     const plist = root.querySelector('#plist');
@@ -136,6 +138,12 @@ function mountWizard(root, mode, step, d) {
               </div>`;
           }).join('')
         : '<div class="empty" style="padding:28px 0"><p>No players yet — add your first one below.</p></div>';
+      root.querySelector('#pastBox').innerHTML = `
+        <div class="tile ${d.past ? 'on' : ''}" data-act="past" role="button" tabindex="0">
+          <div class="grow"><div class="name">Adding an older game?</div>
+            <div class="desc">Skip seating and wonders and go straight to the scores. These games don't count in the wonder stats.</div></div>
+          <span class="switch"></span>
+        </div>`;
       const n = d.selected.length;
       nextBtn.disabled = n < 2;
       nextBtn.textContent = n < 2 ? 'Select at least 2 players' : `Next · ${n} players`;
@@ -155,6 +163,10 @@ function mountWizard(root, mode, step, d) {
           d.selected = d.selected.filter((x) => x !== id);
           persist(); draw();
         }
+      } else if (b.dataset.act === 'past') {
+        d.past = !d.past;
+        d.expansions.wondersPack = !d.past; // no wonders in old games → don't tag them "Wonders Pack"
+        persist(); draw();
       } else if (b.dataset.act === 'next') {
         d.started = true; persist(); goStep('expansions');
       }
@@ -186,18 +198,18 @@ function mountWizard(root, mode, step, d) {
         'What are you playing?',
         'The base game is always included. Turn on any expansions on the table.',
         `<div class="tile on locked"><div class="grow"><div class="name">Base game</div><div class="desc">7 wonders, ages I–III</div></div><span class="switch"></span></div>
-         ${EXPANSIONS.map((x) => `
+         ${EXPANSIONS.filter((x) => !(d.past && x.key === 'wondersPack')).map((x) => `
            <div class="tile ${d.expansions[x.key] ? 'on' : ''}" data-act="exp" data-key="${x.key}" role="button" tabindex="0">
              <div class="grow"><div class="name">${esc(x.name)}</div><div class="desc">${esc(x.desc)}</div></div><span class="switch"></span>
            </div>`).join('')}
-         <p class="muted" style="text-align:center;margin-top:6px">${count} wonders in the pool</p>`,
-        '<button class="btn primary block" data-act="next">Next · Randomize</button>'
+         ${d.past ? '' : `<p class="muted" style="text-align:center;margin-top:6px">${count} wonders in the pool</p>`}`,
+        `<button class="btn primary block" data-act="next">${d.past ? 'Next · Enter scores' : 'Next · Randomize'}</button>`
       );
     };
     handlers.click = (e, b) => {
       if (!b) return;
       if (b.dataset.act === 'exp') { d.expansions[b.dataset.key] = !d.expansions[b.dataset.key]; persist(); draw(); }
-      else if (b.dataset.act === 'next') goStep('setup');
+      else if (b.dataset.act === 'next') goStep(d.past ? 'scores' : 'setup');
     };
     draw();
   }
@@ -357,6 +369,16 @@ function mountWizard(root, mode, step, d) {
 
   /* ================================================================ STEP 4: scores */
   function stepScores() {
+    if (d.past && !edit) { // older game: seating is just the chosen players, no wonders
+      if (!store.isReady()) {
+        root.innerHTML = '<div class="page"><div class="skeleton"></div></div>';
+        const unsub = store.subscribe(() => { if (store.isReady()) { unsub(); stepScores(); } });
+        cleanups.push(unsub);
+        return;
+      }
+      d.seating = d.selected.map((id) => d.seating.find((s) => s.playerId === id)
+        || { playerId: id, name: nameOf(id), wonder: null, side: null });
+    }
     for (const s of d.seating) d.scores[s.playerId] = { ...emptyScores(), ...(d.scores[s.playerId] || {}) };
     const cats = activeCategories(d.expansions);
     const catByKey = (k) => CATEGORIES.find((c) => c.key === k);
@@ -421,11 +443,14 @@ function mountWizard(root, mode, step, d) {
     const cur = () => keys().indexOf(d.scoreView === 'category' ? d.catKey : d.playerId);
     const isLast = () => cur() === keys().length - 1;
 
+    const dateBlock = (heading) => `${heading ? '<div class="h2">Date</div>' : ''}
+      <input class="input" type="date" id="date" value="${esc(d.date)}" style="width:100%;margin-bottom:${heading ? 0 : 16}px" aria-label="Date played">`;
+
     const draw = () => {
       root.innerHTML = layout(
-        edit ? 'Edit scores' : 'Scores',
-        edit ? 'Change any value and save.' : 'Enter points category by category, or player by player.',
-        `<div class="seg" style="margin-bottom:12px">
+        edit ? 'Edit scores' : d.past ? 'Older game' : 'Scores',
+        edit ? 'Change any value and save.' : d.past ? 'Pick the date it was played, then enter the points.' : 'Enter points category by category, or player by player.',
+        `${d.past ? dateBlock(false) : ''}<div class="seg" style="margin-bottom:12px">
            <button class="${d.scoreView === 'category' ? 'on' : ''}" data-act="view" data-k="category">By category</button>
            <button class="${d.scoreView === 'player' ? 'on' : ''}" data-act="view" data-k="player">By player</button>
          </div>
@@ -433,8 +458,7 @@ function mountWizard(root, mode, step, d) {
          <div class="card" id="panel">${panelHtml()}</div>
          <div class="h2">Standings</div>
          <div class="card standings" id="standings">${standingsHtml()}</div>
-         <div class="h2">Date</div>
-         <input class="input" type="date" id="date" value="${esc(d.date)}" style="width:100%">
+         ${d.past ? '' : dateBlock(true)}
          <div style="height:14px"></div>
          <button class="btn outline block" data-act="finish">${edit ? 'Save changes' : 'Finish & save'}</button>`,
         `<button class="btn ghost" data-act="prev" ${cur() === 0 ? 'disabled style="opacity:.4"' : ''}>${icons.back} Prev</button>
@@ -466,7 +490,7 @@ function mountWizard(root, mode, step, d) {
     const inputFor = (pid, key) => root.querySelector(`.st-in[data-pid="${CSS.escape(pid)}"][data-key="${key}"]`);
 
     const finish = async () => {
-      const game = buildGame({ date: d.date, expansions: d.expansions, seating: d.seating, scores: d.scores, createdAt: d.createdAt });
+      const game = buildGame({ date: d.date, expansions: d.expansions, seating: d.seating, scores: d.scores, createdAt: d.createdAt, past: d.past });
       if (edit) game.id = d.editingId;
       const id = store.saveGame(game);
       if (!edit) resetDraft();
